@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>بلف</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:Tahoma,system-ui,sans-serif;background:#0d1b14;color:#f4f1e8;height:100vh;overflow:hidden}
+button{font:inherit;border:0;border-radius:12px;padding:12px 16px;background:#e8b923;color:#222;font-weight:700;cursor:pointer}
+button.alt{background:#24402f;color:#f4f1e8}button.red{background:#d9453b;color:#fff}button:disabled{opacity:.4}
+input{font:inherit;padding:10px;border-radius:10px;border:1px solid #3a5a46;background:#16281e;color:#fff;width:100%}
+.screen{display:none;height:100%;padding:16px;overflow:auto}.screen.on{display:block}
+.col{display:flex;flex-direction:column;gap:10px}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.card-box{background:#16281e;border-radius:16px;padding:14px}
+.av{font-size:32px}.chip{padding:8px 12px;border-radius:20px;background:#24402f;cursor:pointer}.chip.sel{background:#e8b923;color:#222}
+#table{position:relative;height:50vh;margin:6px 0;background:radial-gradient(ellipse,#1f6b43,#134a2d);border:6px solid #5a3a1e;border-radius:50%/45%}
+.seat{position:absolute;transform:translate(-50%,-50%);text-align:center;font-size:12px;transition:.2s}
+.seat .b{background:#0008;border-radius:12px;padding:4px 8px;display:inline-block;min-width:64px}
+.seat.turn .b{outline:2px solid #e8b923;box-shadow:0 0 14px #e8b923}
+.mini{display:inline-block;width:14px;height:20px;border-radius:3px;background:repeating-linear-gradient(45deg,#7a1f2b,#7a1f2b 3px,#a02a3a 3px,#a02a3a 6px);border:1px solid #fff;margin-inline-end:-8px}
+#pile{position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);text-align:center}
+.back{width:44px;height:62px;border-radius:6px;background:repeating-linear-gradient(45deg,#7a1f2b,#7a1f2b 4px,#a02a3a 4px,#a02a3a 8px);border:2px solid #fff;margin:auto;box-shadow:3px 3px 0 #0005}
+.pc{display:none}
+.fly{position:absolute;width:26px;height:38px;border-radius:4px;background:#a02a3a;border:1px solid #fff;z-index:9;transition:all .5s ease-out;left:50%;top:48%}
+#hand{display:flex;overflow-x:auto;padding:14px 4px 6px;direction:ltr;min-height:96px}
+.pk{flex:0 0 auto;width:48px;height:72px;margin-right:-14px;border-radius:7px;background:#fff;color:#111;border:1px solid #999;font-weight:700;font-size:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:.15s;direction:ltr}
+.pk.r{color:#c0212b}.pk.sel{transform:translateY(-16px);border:2px solid #e8b923}
+.big{width:44px;height:64px;margin:3px;flex:none;margin-right:3px}
+#claims{display:flex;gap:6px;overflow-x:auto;padding:6px 0;direction:ltr}
+#ov{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;z-index:20;text-align:center;padding:20px}
+.toast{position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#d9453b;padding:8px 14px;border-radius:10px;z-index:30;display:none}
+</style>
+</head>
+<body>
+<div class="toast" id="toast"></div>
+<div id="ov"><div id="ovc"></div></div>
+
+<!-- Home -->
+<div class="screen on" id="home"><div class="col">
+  <div class="card-box row" style="justify-content:space-between"><div class="row"><span class="av" id="hAv"></span><b id="hName"></b></div><div>🪙 <b id="hCoins">0</b></div></div>
+  <h2 style="text-align:center;margin:8px">🎴 بازی بلف</h2>
+  <button onclick="show('practice')">🤖 تمرین با بات‌ها</button>
+  <button onclick="show('friends')">👥 بازی با دوستان</button>
+  <button class="alt" onclick="openTop()">🏆 جایزه و برترین‌ها</button>
+  <button class="alt" onclick="show('profile')">👤 پروفایل</button>
+  <div class="card-box" style="font-size:13px;line-height:1.9">قانون: هر نوبت ۱ تا ۴ کارت پشت‌رو بنداز و بگو چه عددی هستند (راست یا دروغ). حریف می‌تونه «بلف» بزنه: اگر دروغ بود کل کارت‌های وسط میز میره دست تو، وگرنه دست بلف‌زننده. اولین کسی که کارت‌هاش تموم بشه دست رو می‌بره.</div>
+</div></div>
+
+<!-- Practice -->
+<div class="screen" id="practice"><div class="col">
+  <h3>تمرین با بات</h3>
+  <div>تعداد بات‌ها</div><div class="row" id="pBots"></div>
+  <div>تعداد دست‌ها</div><div class="row" id="pRounds"></div>
+  <button onclick="send({t:'practice',bots:sel.pBots,rounds:sel.pRounds})">شروع تمرین</button>
+  <button class="alt" onclick="show('home')">بازگشت</button>
+</div></div>
+
+<!-- Friends -->
+<div class="screen" id="friends"><div class="col">
+  <h3>بازی با دوستان</h3>
+  <div>حداکثر بازیکن (۲ تا ۶)</div><div class="row" id="fMax"></div>
+  <div>تعداد دست‌ها</div><div class="row" id="fRounds"></div>
+  <button onclick="send({t:'create',max:sel.fMax,rounds:sel.fRounds})">ساخت اتاق و لینک دعوت</button>
+  <input id="jc" placeholder="یا کد اتاق را وارد کن" style="direction:ltr;text-transform:uppercase">
+  <button class="alt" onclick="send({t:'join',code:jc.value})">ورود با کد</button>
+  <button class="alt" onclick="show('home')">بازگشت</button>
+</div></div>
+
+<!-- Lobby -->
+<div class="screen" id="lobby"><div class="col">
+  <h3>لابی بازی</h3>
+  <div class="card-box" id="lInfo"></div>
+  <div class="card-box col" id="lPl"></div>
+  <button onclick="shareLink()">📨 ارسال لینک دعوت</button>
+  <button id="lStart" onclick="send({t:'start'})">▶️ شروع بازی</button>
+  <button class="alt" onclick="send({t:'leave'})">خروج</button>
+</div></div>
+
+<!-- Profile -->
+<div class="screen" id="profile"><div class="col">
+  <h3>پروفایل</h3>
+  <input id="pName" maxlength="16" placeholder="نام کاربری">
+  <div class="row" id="pAv"></div>
+  <button onclick="send({t:'profile',name:pName.value,avatar:sel.pAv})">ذخیره</button>
+  <button class="alt" onclick="show('home')">بازگشت</button>
+</div></div>
+
+<!-- Prize -->
+<div class="screen" id="top"><div class="col">
+  <h3>🏆 جایزه برندگان</h3>
+  <div class="card-box">برنده‌ی هر بازی دوستانه (حداقل ۲ بازیکن واقعی) <b>۵۰۰ سکه</b> می‌گیرد 🪙<br>موجودی شما: <b id="tCoins"></b> | برد: <b id="tWins"></b></div>
+  <div class="card-box col" id="tList"></div>
+  <button class="alt" onclick="show('home')">بازگشت</button>
+</div></div>
+
+<!-- Game -->
+<div class="screen" id="game" style="padding:8px">
+  <div class="row" style="justify-content:space-between;font-size:13px"><span id="gInfo"></span><button class="alt" style="padding:6px 10px" onclick="if(confirm('خروج از بازی؟'))send({t:'leave'})">خروج</button></div>
+  <div id="table"><div id="pile"><div class="back"></div><div id="pCount"></div><div id="pClaim" style="margin-top:4px;font-weight:700"></div></div></div>
+  <div id="status" style="text-align:center;min-height:22px;margin:4px 0"></div>
+  <div class="row" style="justify-content:center" id="acts"></div>
+  <div id="claims"></div>
+  <div id="hand"></div>
+</div>
+
+<script>
+const tg = Telegram.WebApp; tg.ready(); tg.expand();
+const RK = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'], SU = ['♠','♥','♦','♣'];
+const AVS = ['😎','🦊','🐯','🐼','🦁','🐸','🦄','🐙','🤖','👑','🔥','🌹'];
+const $ = (id) => document.getElementById(id);
+const sel = { pBots: 2, pRounds: 1, fMax: 4, fRounds: 3, pAv: '😎' };
+let me, S, ws, picked = [], claim = null, lastDealt = 0;
+
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));if(id==='profile'){pName.value=me.name;sel.pAv=me.avatar;chips('pAv',AVS,null,'pAv')}}
+function toast(m){const t=$('toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2500)}
+function chips(id,vals,_,key){const el=$(id);el.innerHTML='';vals.forEach(v=>{const c=document.createElement('span');c.className='chip'+(sel[key]===v?' sel':'');c.textContent=v;c.onclick=()=>{sel[key]=v;chips(id,vals,_,key)};el.appendChild(c)})}
+chips('pBots',[1,2,3,4,5],0,'pBots');chips('pRounds',[1,3,5,7],0,'pRounds');chips('fMax',[2,3,4,5,6],0,'fMax');chips('fRounds',[1,3,5,7],0,'fRounds');
+function send(m){ws.send(JSON.stringify(m))}
+function openTop(){send({t:'top'});show('top')}
+function shareLink(){const u='https://t.me/share/url?url='+encodeURIComponent(S.link)+'&text='+encodeURIComponent('بیا بلف بازی کنیم 🎴');tg.openTelegramLink(u)}
+function card(c,cls){const r=c%13,s=Math.floor(c/13);return `<div class="pk ${s==1||s==2?'r':''} ${cls||''}" data-c="${c}"><span>${RK[r]}</span><span>${SU[s]}</span></div>`}
+
+function connect(){
+  ws = new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
+  ws.onopen = () => send({t:'auth',init:tg.initData||('dev:'+(localStorage.dev||(localStorage.dev=Math.random().toString(36).slice(2,7))))});
+  ws.onclose = () => setTimeout(connect,1500);
+  ws.onmessage = (e) => { const m = JSON.parse(e.data);
+    if(m.t==='me'){const first=!me;me=m.user;$('hAv').textContent=me.avatar;$('hName').textContent=me.name;$('hCoins').textContent=me.coins;$('tCoins').textContent=me.coins;$('tWins').textContent=me.wins;
+      if(first){const q=new URLSearchParams(location.search).get('room')||(tg.initDataUnsafe&&tg.initDataUnsafe.start_param);if(q)send({t:'join',code:q})} else if($('profile').classList.contains('on')){toast('ذخیره شد ✅');show('home')}}
+    if(m.t==='err')toast(m.m);
+    if(m.t==='left'){S=null;show('home')}
+    if(m.t==='top'){$('tList').innerHTML=m.list.map((u,i)=>`<div class="row" style="justify-content:space-between"><span>${i+1}. ${u.avatar} ${u.name}</span><span>🪙 ${u.coins} · 🏅 ${u.wins}</span></div>`).join('')||'هنوز کسی نیست'}
+    if(m.t==='state'){S=m;render()}
+    if(m.t==='reveal'){reveal(m)}
+  };
+}
+function reveal(m){
+  const o=$('ov');$('ovc').innerHTML=`<div style="font-size:14px;margin-bottom:8px">${m.caller} بلف زد! ادعا: <b>${RK[m.claim]}</b></div><div class="row" style="justify-content:center;direction:ltr">${m.cards.map(c=>card(c,'big')).join('')}</div><h2>${m.bluff?'😈 بلف بود! '+m.liar:'✅ راست بود! '}</h2><div>${m.loser} همه کارت‌های وسط را برمی‌دارد</div>`;
+  o.style.display='flex';setTimeout(()=>o.style.display='none',3200);
+}
+function seatPos(k,m){const a=Math.PI*(0.12+0.76*(m===1?0.5:k/(m-1)));return [50-44*Math.cos(a),52-42*Math.sin(a)]}
+function render(){
+  if(S.status==='lobby'){show('lobby');
+    $('lInfo').innerHTML=`کد اتاق: <b>${S.code}</b><br>${S.players.length}/${S.max} نفر · ${S.rounds} دست`;
+    $('lPl').innerHTML=S.players.map(p=>`<div class="row"><span class="av">${p.avatar}</span>${p.name}${p.id===S.host?' 👑':''}</div>`).join('');
+    $('lStart').style.display=S.host===S.players[S.me].id?'block':'none';return}
+  if(S.status==='end'){show('game');const w=S.players.find(p=>p.id===S.winner);
+    $('ovc').innerHTML=`<h1>🏆</h1><h2>${w.avatar} ${w.name} برنده شد!</h2>${!S.practice&&S.players.filter(p=>!p.bot).length>1?`<div>جایزه: 🪙 ${S.prize}</div>`:''}<br><button onclick="$('ov').style.display='none';send({t:'leave'})">بازگشت به منو</button>`;
+    setTimeout(()=>$('ov').style.display='flex',3300);return}
+  show('game');
+  const n=S.players.length,my=S.me,others=[];
+  for(let k=1;k<n;k++)others.push((my+k)%n);
+  $('table').querySelectorAll('.seat').forEach(e=>e.remove());
+  others.forEach((pi,k)=>{const p=S.players[pi],[x,y]=seatPos(k,others.length);const d=document.createElement('div');d.className='seat'+(S.turn===pi?' turn':'');d.style.cssText=`left:${x}%;top:${y}%`;d.dataset.pi=pi;
+    d.innerHTML=`<div class="b"><div style="font-size:22px">${p.avatar}</div>${p.name}<div>🃏 ${p.n} · ⭐${p.score}</div></div>`;$('table').appendChild(d)});
+  const mine=document.createElement('div');mine.className='seat'+(S.turn===my?' turn':'');mine.style.cssText='left:50%;top:96%';mine.dataset.pi=my;mine.innerHTML=`<div class="b">${S.players[my].avatar} شما ⭐${S.players[my].score}</div>`;$('table').appendChild(mine);
+  $('pCount').textContent=S.pile?`🂠 ${S.pile} کارت`:'میز خالی';
+  $('pClaim').textContent=S.rank!==null?`عدد: ${RK[S.rank]}`:'';
+  $('gInfo').textContent=`دست ${S.round}/${S.rounds}`+(S.practice?' · تمرین':'');
+  if(S.dealt!==lastDealt){lastDealt=S.dealt;dealAnim()}
+  const myTurn=S.turn===my, canCall=S.last&&S.last.p!==my;
+  const turnName=S.players[S.turn].name;
+  $('status').textContent=S.pending!==null&&myTurn?`${S.players[S.pending].name} کارت‌هاش تموم شد! بلف می‌زنی؟`:S.last?`${S.players[S.last.p].name}: ${S.last.n} کارت «${RK[S.last.claim]}» انداخت`:'';
+  if(!myTurn&&!S.last)$('status').textContent=`نوبت ${turnName}`;
+  // actions
+  let a='';
+  if(canCall)a+=`<button class="red" onclick="send({t:'call'})">🚨 بلف!</button>`;
+  if(S.pending!==null&&myTurn)a+=`<button class="alt" onclick="send({t:'accept'})">✅ رد کردن</button>`;
+  if(myTurn&&S.pending===null)a+=`<button id="pb" onclick="doPlay()">🂠 بنداز</button>`;
+  $('acts').innerHTML=a;
+  // claim picker
+  picked=picked.filter(c=>S.hand.includes(c));
+  if(S.rank!==null)claim=S.rank;
+  $('claims').innerHTML=(myTurn&&S.pending===null)?RK.map((r,i)=>S.rank!==null&&S.rank!==i?'':`<span class="chip ${claim===i?'sel':''}" onclick="claim=${i};render()">${r}</span>`).join(''):'';
+  $('hand').innerHTML=S.hand.map(c=>card(c,picked.includes(c)?'sel':'')).join('');
+  $('hand').querySelectorAll('.pk').forEach(el=>el.onclick=()=>{const c=+el.dataset.c;if(picked.includes(c))picked=picked.filter(x=>x!==c);else if(picked.length<4)picked.push(c);render()});
+}
+function doPlay(){if(!picked.length)return toast('کارت انتخاب کن');if(claim===null)return toast('عدد ادعایی را انتخاب کن');send({t:'play',cards:picked,claim});picked=[];claim=null}
+function dealAnim(){
+  const t=$('table');const tr=t.getBoundingClientRect();
+  [...t.querySelectorAll('.seat')].forEach((s,si)=>{const r=s.getBoundingClientRect();
+    for(let i=0;i<4;i++){const f=document.createElement('div');f.className='fly';t.appendChild(f);
+      setTimeout(()=>{f.style.left=(r.left+r.width/2-tr.left)+'px';f.style.top=(r.top+r.height/2-tr.top)+'px';f.style.opacity='0.2'},60+(i*S.players.length+si)*60);
+      setTimeout(()=>f.remove(),900+(i*S.players.length+si)*60)}})
+}
+connect();
+</script>
+</body>
+</html>
